@@ -35,6 +35,8 @@
 #define ETH_MEMIF_MAC_ARG		"mac"
 #define ETH_MEMIF_ZC_ARG		"zero-copy"
 #define ETH_MEMIF_SECRET_ARG		"secret"
+#define ETH_MEMIF_NUM_RXQ_ARG		"nrxq"
+#define ETH_MEMIF_NUM_TXQ_ARG		"ntxq"
 
 static const char * const valid_arguments[] = {
 	ETH_MEMIF_ID_ARG,
@@ -45,6 +47,8 @@ static const char * const valid_arguments[] = {
 	ETH_MEMIF_MAC_ARG,
 	ETH_MEMIF_ZC_ARG,
 	ETH_MEMIF_SECRET_ARG,
+	ETH_MEMIF_NUM_RXQ_ARG,
+	ETH_MEMIF_NUM_TXQ_ARG,
 	NULL
 };
 
@@ -1029,6 +1033,20 @@ memif_create(struct rte_vdev_device *vdev, enum memif_role_t role,
 	     uint16_t pkt_buffer_size, const char *secret,
 	     struct rte_ether_addr *ether_addr)
 {
+	return memif_create(vdev, role, id, flags, socket_filename, 
+		log2_ring_size, pkt_buffer_size, secret, ether_addr, 
+		ETH_MEMIF_DEFAULT_RX_Q_COUNT, ETH_MEMIF_DEFAULT_TX_Q_COUNT);
+}
+
+static int
+memif_create(struct rte_vdev_device *vdev, enum memif_role_t role,
+	     memif_interface_id_t id, uint32_t flags,
+	     const char *socket_filename,
+	     memif_log2_ring_size_t log2_ring_size,
+	     uint16_t pkt_buffer_size, const char *secret,
+	     struct rte_ether_addr *ether_addr, 
+		 uint16_t nrxq, uint16_t ntxq)
+{
 	int ret = 0;
 	struct rte_eth_dev *eth_dev;
 	struct rte_eth_dev_data *data;
@@ -1047,6 +1065,9 @@ memif_create(struct rte_vdev_device *vdev, enum memif_role_t role,
 		MIF_LOG(ERR, "%s: Unable to allocate device struct.", name);
 		return -1;
 	}
+	// nb_rx_queues will be used in .dev_configure hopefully
+	eth_dev->data->nb_rx_queues = nrxq;
+	eth_dev->data->nb_tx_queues = ntxq;
 
 	process_private = (struct pmd_process_private *)
 		rte_zmalloc(name, sizeof(struct pmd_process_private),
@@ -1204,6 +1225,22 @@ memif_check_socket_filename(const char *filename)
 	return ret;
 }
 
+// used for both nxq and txq
+static int
+memif_set_nq(const char *key __rte_unused, const char *value, void *extra_args)
+{
+	unsigned long tmp;
+	uint16_t *nq = (uint16_t *)extra_args;
+
+	tmp = strtoul(value, NULL, 10);
+	if (tmp >= ETH_MEMIF_MAX_Q_COUNT) {
+		MIF_LOG(ERR, "Invalid buffer size: %s.", value);
+		return -EINVAL;
+	}
+	*nq = tmp;
+	return 0;
+}
+
 static int
 memif_set_socket_filename(const char *key __rte_unused, const char *value,
 			  void *extra_args)
@@ -1244,6 +1281,8 @@ rte_pmd_memif_probe(struct rte_vdev_device *vdev)
 	enum memif_role_t role = MEMIF_ROLE_SLAVE;
 	memif_interface_id_t id = 0;
 	uint16_t pkt_buffer_size = ETH_MEMIF_DEFAULT_PKT_BUFFER_SIZE;
+	uint16_t nrxq = ETH_MEMIF_DEFAULT_RX_Q_COUNT; 
+	uint16_t ntxq = ETH_MEMIF_DEFAULT_TX_Q_COUNT; 
 	memif_log2_ring_size_t log2_ring_size = ETH_MEMIF_DEFAULT_RING_SIZE;
 	const char *socket_filename = ETH_MEMIF_DEFAULT_SOCKET_FILENAME;
 	uint32_t flags = 0;
@@ -1332,6 +1371,14 @@ rte_pmd_memif_probe(struct rte_vdev_device *vdev)
 			goto exit;
 		ret = rte_kvargs_process(kvlist, ETH_MEMIF_SECRET_ARG,
 					 &memif_set_secret, (void *)(&secret));
+		if (ret < 0)
+			goto exit;
+		ret = rte_kvargs_process(kvlist, ETH_MEMIF_NUM_RXQ_ARG,
+					 &memif_set_nq, &nrxq);
+		if (ret < 0)
+			goto exit;
+		et = rte_kvargs_process(kvlist, ETH_MEMIF_NUM_TXQ_ARG,
+					 &memif_set_nq, &ntxq);
 		if (ret < 0)
 			goto exit;
 	}
