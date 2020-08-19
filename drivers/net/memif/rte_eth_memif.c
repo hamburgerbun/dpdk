@@ -1026,7 +1026,7 @@ static const struct eth_dev_ops ops = {
 };
 
 static int
-memif_create(struct rte_vdev_device *vdev, enum memif_role_t role,
+memif_create_default(struct rte_vdev_device *vdev, enum memif_role_t role,
 	     memif_interface_id_t id, uint32_t flags,
 	     const char *socket_filename,
 	     memif_log2_ring_size_t log2_ring_size,
@@ -1385,7 +1385,8 @@ rte_pmd_memif_probe(struct rte_vdev_device *vdev)
 
 	/* create interface */
 	ret = memif_create(vdev, role, id, flags, socket_filename,
-			   log2_ring_size, pkt_buffer_size, secret, ether_addr);
+			   log2_ring_size, pkt_buffer_size, secret, ether_addr, 
+			   nrxq, ntxq);
 
 exit:
 	if (kvlist != NULL)
