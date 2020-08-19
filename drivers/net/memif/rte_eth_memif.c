@@ -1026,19 +1026,6 @@ static const struct eth_dev_ops ops = {
 };
 
 static int
-memif_create_default(struct rte_vdev_device *vdev, enum memif_role_t role,
-	     memif_interface_id_t id, uint32_t flags,
-	     const char *socket_filename,
-	     memif_log2_ring_size_t log2_ring_size,
-	     uint16_t pkt_buffer_size, const char *secret,
-	     struct rte_ether_addr *ether_addr)
-{
-	return memif_create(vdev, role, id, flags, socket_filename, 
-		log2_ring_size, pkt_buffer_size, secret, ether_addr, 
-		ETH_MEMIF_DEFAULT_RX_Q_COUNT, ETH_MEMIF_DEFAULT_TX_Q_COUNT);
-}
-
-static int
 memif_create(struct rte_vdev_device *vdev, enum memif_role_t role,
 	     memif_interface_id_t id, uint32_t flags,
 	     const char *socket_filename,
@@ -1377,7 +1364,7 @@ rte_pmd_memif_probe(struct rte_vdev_device *vdev)
 					 &memif_set_nq, &nrxq);
 		if (ret < 0)
 			goto exit;
-		et = rte_kvargs_process(kvlist, ETH_MEMIF_NUM_TXQ_ARG,
+		ret = rte_kvargs_process(kvlist, ETH_MEMIF_NUM_TXQ_ARG,
 					 &memif_set_nq, &ntxq);
 		if (ret < 0)
 			goto exit;
